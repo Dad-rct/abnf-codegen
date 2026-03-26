@@ -1,0 +1,36 @@
+{
+  "name": "@pebbletree/abnf-codegen",
+  "version": "0.1.0",
+  "description": "Type-safe ABNF (RFC 5234) parser/builder code generator",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "abnf-codegen": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --reporter=verbose",
+    "test:watch": "vitest --reporter=verbose",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "abnf",
+    "rfc5234",
+    "parser",
+    "codegen",
+    "sip"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "abnf": "~5.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "~18.19.130",
+    "tsx": "~4.21.0",
+    "typescript": "~6.0.2",
+    "vitest": "~2.1.9"
+  }
+}
