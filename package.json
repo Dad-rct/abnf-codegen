@@ -1,9 +1,13 @@
 {
   "name": "@pebbletree/abnf-codegen",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Type-safe ABNF (RFC 5234) parser/builder code generator",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "grammars"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -21,7 +25,8 @@
     "build": "tsc",
     "test": "vitest run --reporter=verbose",
     "test:watch": "vitest --reporter=verbose",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
   },
   "keywords": [
     "abnf",
