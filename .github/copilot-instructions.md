@@ -41,7 +41,17 @@ npm install           # install dependencies
 npx vitest run --reporter=verbose  # run all tests
 npx tsc --noEmit      # type-check
 npx tsx src/cli.ts grammars/core.abnf -o src/generated  # generate code
+npx tsx src/cli.ts grammars/core.abnf -o src/generated -r @pebbletree/abnf-codegen/runtime  # with custom runtime import
 ```
+
+## Runtime Subpath Export
+
+The package exposes a `./runtime` subpath export so consuming repos can import runtime types directly:
+```typescript
+import { MaybeNumeric, ParseResult } from '@pebbletree/abnf-codegen/runtime';
+```
+
+The `--runtime-import` CLI flag (or `runtimeImport` option in `generate()`) controls what import path generated code uses for runtime types. Default: `'../runtime/index.js'` (for co-located runtime). Set to `'@pebbletree/abnf-codegen/runtime'` when generating into a separate consuming repo.
 
 ## Don'ts
 

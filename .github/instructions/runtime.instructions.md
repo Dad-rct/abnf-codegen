@@ -30,6 +30,12 @@ Helper factories: `success(value, nextOffset)` and `failure(rule, offset, expect
 
 Stores `rule`, `offset`, `expected`, `actual`, and `children: ParseError[]` (for nested alternation errors). The `toString()` method formats a human-readable error tree.
 
+## Subpath Export
+
+The runtime is exposed as a subpath export: `@pebbletree/abnf-codegen/runtime`. This allows consuming repos to depend on just the runtime types without importing the full codegen package. The `exports` field in `package.json` maps `./runtime` to `dist/runtime/index.js`.
+
 ## Compatibility
 
 These types are the public API contract with generated code. Breaking changes here require updating all generated code. Add new methods/properties conservatively.
+
+The runtime is imported by generated code via a configurable path (default `'../runtime/index.js'`, or `'@pebbletree/abnf-codegen/runtime'` for consuming repos). Both paths resolve to the same module — ensure exports stay in sync.

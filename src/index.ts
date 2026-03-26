@@ -1,6 +1,6 @@
 export { readString, readFile, validateRefs } from './reader/index.js';
 export { analyze } from './analyzer/index.js';
-export { generate } from './codegen/index.js';
+export { generate, type GenerateOptions } from './codegen/index.js';
 export {
     MaybeNumeric,
     NumericConversionError,

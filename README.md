@@ -35,18 +35,36 @@ abnf-codegen grammars/core.abnf grammars/sip.abnf -o src/generated
 
 # Explicit flags
 abnf-codegen -i grammars/core.abnf -i grammars/sip.abnf -o src/generated
+
+# Custom runtime import path (for consuming repos)
+abnf-codegen grammars/sip.abnf -o src/generated -r @pebbletree/abnf-codegen/runtime
 ```
 
 ### Programmatic API
 
 ```typescript
-import { readFile, analyze, generate } from 'abnf-codegen';
+import { readFile, analyze, generate } from '@pebbletree/abnf-codegen';
 
 const rules = readFile('grammars/sip.abnf');
 const analyzed = analyze(rules);
 const files = generate(analyzed);
 // files is an array of { filename, content } objects
+
+// With custom runtime import path for generated code:
+const files = generate(analyzed, {
+  runtimeImport: '@pebbletree/abnf-codegen/runtime'
+});
 ```
+
+### Runtime Subpath Export
+
+Consuming repos can import runtime types directly without depending on the full codegen package:
+
+```typescript
+import { MaybeNumeric, ParseResult, success, failure } from '@pebbletree/abnf-codegen/runtime';
+```
+
+Use `--runtime-import` / `-r` CLI flag (or `runtimeImport` option in `generate()`) to configure generated code to import from this subpath instead of a relative path.
 
 ### Generated Code
 

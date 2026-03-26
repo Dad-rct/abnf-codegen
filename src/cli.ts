@@ -10,12 +10,14 @@ import type { Rules } from './reader/types.js';
 interface CliArgs {
     inputs: string[];
     output: string;
+    runtimeImport?: string;
 }
 
 function parseArgs(argv: string[]): CliArgs {
     const args = argv.slice(2);
     const inputs: string[] = [];
     let output = 'src/generated';
+    let runtimeImport: string | undefined;
 
     for (let i = 0; i < args.length; i++) {
         switch (args[i]) {
@@ -28,6 +30,11 @@ function parseArgs(argv: string[]): CliArgs {
             case '-o':
                 i++;
                 if (i < args.length) output = args[i];
+                break;
+            case '--runtime-import':
+            case '-r':
+                i++;
+                if (i < args.length) runtimeImport = args[i];
                 break;
             case '--help':
             case '-h':
@@ -47,7 +54,7 @@ function parseArgs(argv: string[]): CliArgs {
         process.exit(1);
     }
 
-    return { inputs, output };
+    return { inputs, output, runtimeImport };
 }
 
 function printUsage(): void {
@@ -57,6 +64,7 @@ Usage: abnf-codegen [options] <input-files...>
 Options:
   -i, --input <file>    Input .abnf file (can be specified multiple times)
   -o, --output <dir>    Output directory for generated code (default: src/generated)
+  -r, --runtime-import <path>  Import path for runtime types (default: ../runtime/index.js)
   -h, --help            Show this help message
 
 Examples:
@@ -86,7 +94,7 @@ function mergeRules(files: string[]): Rules {
 }
 
 function main(): void {
-    const { inputs, output } = parseArgs(process.argv);
+    const { inputs, output, runtimeImport } = parseArgs(process.argv);
 
     // Resolve input file paths
     const resolvedInputs = inputs.map(f => path.resolve(f));
@@ -114,7 +122,7 @@ function main(): void {
     const analyzed = analyze(rules);
 
     console.log(`Generating TypeScript code...`);
-    const files = generate(analyzed);
+    const files = generate(analyzed, runtimeImport ? { runtimeImport } : undefined);
 
     // Write output
     const outDir = path.resolve(output);

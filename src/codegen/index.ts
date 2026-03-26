@@ -14,19 +14,31 @@ export interface GeneratedFile {
 }
 
 /**
+ * Options for code generation.
+ */
+export interface GenerateOptions {
+    /** Import path for runtime types (ParseResult, MaybeNumeric, etc.).
+     *  Defaults to '../runtime/index.js'. */
+    runtimeImport?: string;
+}
+
+const DEFAULT_RUNTIME_IMPORT = '../runtime/index.js';
+
+/**
  * Generate all TypeScript files for an analyzed ABNF grammar.
  */
-export function generate(grammar: AnalyzedGrammar): GeneratedFile[] {
+export function generate(grammar: AnalyzedGrammar, options?: GenerateOptions): GeneratedFile[] {
+    const runtimeImport = options?.runtimeImport ?? DEFAULT_RUNTIME_IMPORT;
     const files: GeneratedFile[] = [];
 
     // Generate per-rule files
     for (const [name, analysis] of grammar.ruleAnalysis) {
-        const file = generateRuleFile(analysis, grammar);
+        const file = generateRuleFile(analysis, grammar, runtimeImport);
         files.push(file);
     }
 
     // Generate barrel index
-    files.push(generateIndex(grammar));
+    files.push(generateIndex(grammar, runtimeImport));
 
     // Generate facade class
     files.push(generateFacade(grammar));
@@ -34,13 +46,13 @@ export function generate(grammar: AnalyzedGrammar): GeneratedFile[] {
     return files;
 }
 
-function generateRuleFile(analysis: RuleAnalysis, grammar: AnalyzedGrammar): GeneratedFile {
+function generateRuleFile(analysis: RuleAnalysis, grammar: AnalyzedGrammar, runtimeImport: string): GeneratedFile {
     const filename = `${analysis.originalName.toLowerCase().replace(/[^a-z0-9]/g, '-')}.ts`;
     const className = toPascalCase(analysis.originalName);
     const sections: string[] = [];
 
     // Imports
-    sections.push(generateImports(analysis, grammar));
+    sections.push(generateImports(analysis, grammar, runtimeImport));
 
     // Node class
     sections.push(emitNodeType(analysis, grammar));
@@ -54,13 +66,13 @@ function generateRuleFile(analysis: RuleAnalysis, grammar: AnalyzedGrammar): Gen
     return { filename, content: sections.join('\n\n') + '\n' };
 }
 
-function generateImports(analysis: RuleAnalysis, grammar: AnalyzedGrammar): string {
+function generateImports(analysis: RuleAnalysis, grammar: AnalyzedGrammar, runtimeImport: string): string {
     const lines: string[] = [];
-    lines.push(`import { type ParseResult, ParseError, success, failure } from '../runtime/index.js';`);
+    lines.push(`import { type ParseResult, ParseError, success, failure } from '${runtimeImport}';`);
 
     // Check if MaybeNumeric is needed
     if (analysis.numericPattern.isNumeric || needsMaybeNumeric(analysis, grammar)) {
-        lines.push(`import { MaybeNumeric } from '../runtime/index.js';`);
+        lines.push(`import { MaybeNumeric } from '${runtimeImport}';`);
     }
 
     // Import referenced rule parsers/nodes
@@ -84,9 +96,9 @@ function needsMaybeNumeric(analysis: RuleAnalysis, grammar: AnalyzedGrammar): bo
     return false;
 }
 
-function generateIndex(grammar: AnalyzedGrammar): GeneratedFile {
+function generateIndex(grammar: AnalyzedGrammar, runtimeImport: string): GeneratedFile {
     const lines: string[] = [];
-    lines.push(`export { type ParseResult, ParseError, success, failure, MaybeNumeric } from '../runtime/index.js';`);
+    lines.push(`export { type ParseResult, ParseError, success, failure, MaybeNumeric } from '${runtimeImport}';`);
 
     for (const [name, analysis] of grammar.ruleAnalysis) {
         const file = analysis.originalName.toLowerCase().replace(/[^a-z0-9]/g, '-');

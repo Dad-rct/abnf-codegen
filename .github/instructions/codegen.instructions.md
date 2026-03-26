@@ -39,3 +39,11 @@ Each generated rule file imports:
 - `ParseResult`, `ParseError`, `success`, `failure` from the runtime
 - `MaybeNumeric` from the runtime (if the rule or its references involve numeric patterns)
 - Referenced rule Node/Parser classes from sibling files
+
+## Runtime Import Path
+
+The runtime import path is **configurable** via `GenerateOptions.runtimeImport` (or CLI `--runtime-import` / `-r`). Default: `'../runtime/index.js'`.
+
+When generating code for a consuming repo (e.g. a SIP parser), set this to `'@pebbletree/abnf-codegen/runtime'` so generated files import from the published package rather than a relative path.
+
+The `generate()` function threads `runtimeImport` through `generateRuleFile()`, `generateImports()`, and `generateIndex()`. All runtime import statements in generated code use this path — never hardcode it.
