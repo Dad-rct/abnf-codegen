@@ -105,6 +105,8 @@ describe('E2E: Pipeline for SIP-like grammar', () => {
         expect(methodFile.content).toContain('MethodParser');
         expect(methodFile.content).toContain('"INVITE"');
         expect(methodFile.content).toContain('"BYE"');
+        // Literal alternation should produce a typed .value getter
+        expect(methodFile.content).toContain("get value(): 'INVITE' | 'ACK' | 'BYE' | 'CANCEL' | 'OPTIONS' | 'REGISTER'");
 
         const maxFwdFile = files.find(f => f.filename === 'max-forwards.ts')!;
         expect(maxFwdFile.content).toContain('MaxForwardsParser');

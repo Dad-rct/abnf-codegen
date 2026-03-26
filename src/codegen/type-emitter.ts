@@ -64,6 +64,20 @@ export function emitNodeType(analysis: RuleAnalysis, grammar: AnalyzedGrammar): 
         lines.push(`  }`);
     }
 
+    // Typed .value getter for literal alternations
+    if (analysis.literalPattern) {
+        const { alternatives, caseSensitive } = analysis.literalPattern;
+        const unionType = alternatives.map(a => `'${escapeForLiteralType(a)}'`).join(' | ');
+        lines.push('');
+        lines.push(`  get value(): ${unionType} {`);
+        if (caseSensitive) {
+            lines.push(`    return this.raw as ${unionType};`);
+        } else {
+            lines.push(`    return this.raw.toUpperCase() as ${unionType};`);
+        }
+        lines.push(`  }`);
+    }
+
     // toString for reversibility
     lines.push('');
     lines.push(`  toString(): string {`);
@@ -84,7 +98,7 @@ export interface FieldInfo {
 /**
  * Analyze an AST node and collect field info for sub-rules that need lazy getters.
  */
-function collectFields(node: ASTNode, grammar: AnalyzedGrammar): FieldInfo[] {
+export function collectFields(node: ASTNode, grammar: AnalyzedGrammar): FieldInfo[] {
     const fields: FieldInfo[] = [];
 
     switch (node.type) {
@@ -145,4 +159,8 @@ function collectFieldsForElement(node: ASTNode, index: number, grammar: Analyzed
         }
     }
     return [];
+}
+
+function escapeForLiteralType(s: string): string {
+    return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readString, readFile } from '../../src/reader/index.js';
 import { buildDependencyGraph } from '../../src/analyzer/dependency-graph.js';
-import { detectNumericPattern } from '../../src/analyzer/pattern-detector.js';
+import { detectNumericPattern, detectLiteralPattern } from '../../src/analyzer/pattern-detector.js';
 import { analyze } from '../../src/analyzer/index.js';
 import * as path from 'node:path';
 
@@ -121,6 +121,56 @@ describe('Pattern Detector', () => {
     });
 });
 
+describe('Literal Pattern Detector', () => {
+    it('detects a single case-insensitive literal', () => {
+        const rules = readString('method = "INVITE"\r\n');
+        const pat = detectLiteralPattern(rules.defs['METHOD'].def);
+        expect(pat).not.toBeNull();
+        expect(pat!.alternatives).toEqual(['INVITE']);
+        expect(pat!.caseSensitive).toBe(false);
+    });
+
+    it('detects alternation of case-insensitive literals', () => {
+        const rules = readString('method = "INVITE" / "ACK" / "BYE"\r\n');
+        const pat = detectLiteralPattern(rules.defs['METHOD'].def);
+        expect(pat).not.toBeNull();
+        expect(pat!.alternatives).toEqual(['INVITE', 'ACK', 'BYE']);
+        expect(pat!.caseSensitive).toBe(false);
+    });
+
+    it('uppercases canonical forms for case-insensitive literals', () => {
+        const rules = readString('method = "invite" / "Ack"\r\n');
+        const pat = detectLiteralPattern(rules.defs['METHOD'].def);
+        expect(pat).not.toBeNull();
+        expect(pat!.alternatives).toEqual(['INVITE', 'ACK']);
+    });
+
+    it('deduplicates after case normalization', () => {
+        const rules = readString('method = "invite" / "INVITE"\r\n');
+        const pat = detectLiteralPattern(rules.defs['METHOD'].def);
+        expect(pat).not.toBeNull();
+        expect(pat!.alternatives).toEqual(['INVITE']);
+    });
+
+    it('returns null for mixed literal and non-literal alternations', () => {
+        const rules = readString('token = "a" / DIGIT\r\n');
+        const pat = detectLiteralPattern(rules.defs['TOKEN'].def);
+        expect(pat).toBeNull();
+    });
+
+    it('returns null for non-literal rules', () => {
+        const rules = readString('num = 1*DIGIT\r\n');
+        const pat = detectLiteralPattern(rules.defs['NUM'].def);
+        expect(pat).toBeNull();
+    });
+
+    it('returns null for range rules', () => {
+        const rules = readString('lower = %x61-7A\r\n');
+        const pat = detectLiteralPattern(rules.defs['LOWER'].def);
+        expect(pat).toBeNull();
+    });
+});
+
 describe('Analyzer', () => {
     it('produces analysis for all rules', () => {
         const rules = readString('top = sub\r\nsub = "x"\r\n');
@@ -169,5 +219,25 @@ describe('Analyzer', () => {
         expect(result.ruleAnalysis.size).toBe(16);
         // DIGIT = %x30-39 is a range
         expect(result.ruleAnalysis.get('DIGIT')!.typeCategory).toBe('range');
+    });
+
+    it('detects literalPattern on alternation of string literals', () => {
+        const rules = readString('method = "INVITE" / "ACK" / "BYE"\r\n');
+        const result = analyze(rules);
+        const analysis = result.ruleAnalysis.get('METHOD')!;
+        expect(analysis.literalPattern).not.toBeNull();
+        expect(analysis.literalPattern!.alternatives).toEqual(['INVITE', 'ACK', 'BYE']);
+    });
+
+    it('sets literalPattern to null for numeric rules', () => {
+        const rules = readString('num = 1*DIGIT\r\n');
+        const result = analyze(rules);
+        expect(result.ruleAnalysis.get('NUM')!.literalPattern).toBeNull();
+    });
+
+    it('sets literalPattern to null for mixed alternations', () => {
+        const rules = readString('token = "a" / DIGIT\r\n');
+        const result = analyze(rules);
+        expect(result.ruleAnalysis.get('TOKEN')!.literalPattern).toBeNull();
     });
 });

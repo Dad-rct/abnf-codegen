@@ -1,9 +1,9 @@
 import type { Rules, Rule, ASTNode } from '../reader/types.js';
 import { buildDependencyGraph, type DependencyGraph } from './dependency-graph.js';
-import { detectNumericPattern, type NumericPattern } from './pattern-detector.js';
+import { detectNumericPattern, type NumericPattern, detectLiteralPattern, type LiteralPattern } from './pattern-detector.js';
 
 export { type DependencyGraph } from './dependency-graph.js';
-export { type NumericPattern } from './pattern-detector.js';
+export { type NumericPattern, type LiteralPattern } from './pattern-detector.js';
 
 /**
  * Intermediate representation of an analyzed ABNF grammar.
@@ -30,6 +30,8 @@ export interface RuleAnalysis {
     isCyclic: boolean;
     /** Detected numeric pattern, if any */
     numericPattern: NumericPattern;
+    /** Detected literal alternation pattern, if any */
+    literalPattern: LiteralPattern | null;
     /** Inferred TypeScript type category */
     typeCategory: TypeCategory;
 }
@@ -66,6 +68,7 @@ export function analyze(rules: Rules): AnalyzedGrammar {
         if (!rule) continue;
 
         const numericPattern = detectNumericPattern(rule.def);
+        const literalPattern = numericPattern.isNumeric ? null : detectLiteralPattern(rule.def);
         const typeCategory = inferTypeCategory(rule.def, numericPattern);
 
         ruleAnalysis.set(name, {
@@ -75,6 +78,7 @@ export function analyze(rules: Rules): AnalyzedGrammar {
             references: graph.edges.get(name) ?? new Set(),
             isCyclic: cyclicRules.has(name),
             numericPattern,
+            literalPattern,
             typeCategory,
         });
     }

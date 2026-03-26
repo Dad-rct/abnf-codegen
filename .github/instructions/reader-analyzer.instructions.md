@@ -36,5 +36,12 @@ Recognizes digit-sequence patterns → marks as `MaybeNumeric`:
 - `1*DIGIT "." 1*DIGIT` — decimal-like  
 - `DIGIT` (bare reference) — single digit
 
+Recognizes literal alternation patterns → marks as `LiteralPattern`:
+- `"INVITE"` — single case-insensitive literal
+- `"INVITE" / "ACK" / "BYE"` — alternation of case-insensitive literals
+- All alternatives must be string literals with uniform case sensitivity
+- Canonical forms are uppercase for case-insensitive, original for case-sensitive
+- Mixed case-sensitivity alternations are not detected
+
 ### Type Categories
 Each rule gets a `typeCategory` that drives codegen decisions: `literal`, `alternation`, `concatenation`, `repetition`, `numeric`, `range`, `reference`, `group`, `prose`.

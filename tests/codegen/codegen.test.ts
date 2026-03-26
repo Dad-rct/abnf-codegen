@@ -115,6 +115,8 @@ describe('Code Generator', () => {
         const topFile = files.find(f => f.filename === 'top.ts')!;
         expect(topFile.content).toContain('SubParser.parse');
         expect(topFile.content).toContain("import { SubNode, SubParser } from './sub.js'");
+        // Node constructor should receive sub-rule offsets
+        expect(topFile.content).toContain('new TopNode(raw, 0, raw.length)');
     });
 
     it('generates bounded repetition code', () => {
@@ -136,5 +138,47 @@ describe('Code Generator', () => {
         // Builder should accept string or object with raw
         expect(ruleFile.content).toContain("typeof value === 'string'");
         expect(ruleFile.content).toContain('value.raw');
+    });
+
+    it('generates .value getter for literal alternation', () => {
+        const rules = readString('method = "INVITE" / "ACK" / "BYE"\r\n');
+        const analyzed = analyze(rules);
+        const files = generate(analyzed);
+
+        const ruleFile = files.find(f => f.filename === 'method.ts')!;
+        expect(ruleFile.content).toContain("get value(): 'INVITE' | 'ACK' | 'BYE'");
+        expect(ruleFile.content).toContain('this.raw.toUpperCase()');
+    });
+
+    it('generates .value getter for single literal', () => {
+        const rules = readString('greeting = "hello"\r\n');
+        const analyzed = analyze(rules);
+        const files = generate(analyzed);
+
+        const ruleFile = files.find(f => f.filename === 'greeting.ts')!;
+        expect(ruleFile.content).toContain("get value(): 'HELLO'");
+        expect(ruleFile.content).toContain('this.raw.toUpperCase()');
+    });
+
+    it('does not generate .value getter for non-literal rules', () => {
+        const rules = readString('digits = 1*DIGIT\r\n');
+        const analyzed = analyze(rules);
+        const files = generate(analyzed);
+
+        const ruleFile = files.find(f => f.filename === 'digits.ts')!;
+        expect(ruleFile.content).not.toContain('get value()');
+    });
+
+    it('passes sub-rule offsets in concatenation constructor', () => {
+        const rules = readString('pair = first second\r\nfirst = "a"\r\nsecond = "b"\r\n');
+        const analyzed = analyze(rules);
+        const files = generate(analyzed);
+
+        const pairFile = files.find(f => f.filename === 'pair.ts')!;
+        // Constructor should include offset args for first and second
+        expect(pairFile.content).toContain('firstStart: number');
+        expect(pairFile.content).toContain('secondStart: number');
+        // Parser should pass offset expressions to constructor
+        expect(pairFile.content).toMatch(/new PairNode\(raw, .+\)/);
     });
 });

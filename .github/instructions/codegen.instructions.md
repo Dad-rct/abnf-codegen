@@ -29,6 +29,10 @@ Do NOT make lazy fields eager. The performance benefit for SIP (parsing full mes
 
 When the pattern detector identifies a digit sequence (1*DIGIT, DIGIT, etc.), the codegen emits `MaybeNumeric` instead of `string`. The lazy init creates `new MaybeNumeric(this.raw.substring(start, end))`.
 
+## Literal Alternation `.value` Getter
+
+When the pattern detector identifies a rule as a pure string literal or alternation of pure string literals (e.g. `Method = "INVITE" / "ACK" / "BYE"`), the Node class gets a `.value` getter returning a string literal union type (`'INVITE' | 'ACK' | 'BYE'`). For case-insensitive literals, `.value` returns `this.raw.toUpperCase()`. For case-sensitive literals (`%s"..."`), `.value` returns `this.raw` directly. This is a zero-cost cast — no runtime class needed.
+
 ## Alternation Codegen
 
 Alternations use a try-each strategy with error collection. Each alternative is tried in order; on failure its `ParseError` is collected. If all fail, a combined error with child errors is returned.

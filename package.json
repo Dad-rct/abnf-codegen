@@ -1,6 +1,6 @@
 {
   "name": "@pebbletree/abnf-codegen",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Type-safe ABNF (RFC 5234) parser/builder code generator",
   "type": "module",
   "main": "dist/index.js",

@@ -103,3 +103,64 @@ function checkConcatenation(node: { elements: ASTNode[] }, ruleNames?: Set<strin
 
     return NO_NUMERIC;
 }
+
+// ---- Literal pattern detection ----
+
+/**
+ * Describes a rule whose definition is a single string literal or an
+ * alternation of pure string literals. Used to emit a typed `.value`
+ * getter with a string-literal union type on the Node class.
+ */
+export interface LiteralPattern {
+    /** Canonical forms of each alternative (uppercase for case-insensitive) */
+    alternatives: string[];
+    /** True when every alternative is case-sensitive (%s"...") */
+    caseSensitive: boolean;
+}
+
+/**
+ * Detect whether an AST node is a pure string literal or an alternation
+ * of pure string literals. Returns null when non-literal nodes are present.
+ */
+export function detectLiteralPattern(node: ASTNode): LiteralPattern | null {
+    const lit = unwrapToLiteral(node);
+    if (lit) {
+        return { alternatives: [lit.canonical], caseSensitive: lit.caseSensitive };
+    }
+
+    if (node.type === 'alternation') {
+        const alternatives: string[] = [];
+        let allCaseSensitive = true;
+        let allCaseInsensitive = true;
+
+        for (const alt of node.alts) {
+            const l = unwrapToLiteral(alt);
+            if (!l) return null;
+            alternatives.push(l.canonical);
+            if (l.caseSensitive) allCaseInsensitive = false;
+            else allCaseSensitive = false;
+        }
+
+        // Require uniform case sensitivity across all alternatives
+        if (!allCaseSensitive && !allCaseInsensitive) return null;
+
+        // Deduplicate (e.g. "invite" / "INVITE" both map to "INVITE")
+        const unique = [...new Set(alternatives)];
+        return { alternatives: unique, caseSensitive: allCaseSensitive };
+    }
+
+    return null;
+}
+
+function unwrapToLiteral(node: ASTNode): { canonical: string; caseSensitive: boolean } | null {
+    if (node.type === 'caseInsensitveString') {
+        return { canonical: node.str.toUpperCase(), caseSensitive: false };
+    }
+    if (node.type === 'caseSensitveString') {
+        return { canonical: node.str, caseSensitive: true };
+    }
+    if (node.type === 'group') {
+        return unwrapToLiteral(node.alt);
+    }
+    return null;
+}

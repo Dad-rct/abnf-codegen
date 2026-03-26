@@ -1,6 +1,6 @@
 import type { ASTNode } from '../reader/types.js';
 import type { AnalyzedGrammar, RuleAnalysis } from '../analyzer/index.js';
-import { toPascalCase, toCamelCase } from './type-emitter.js';
+import { toPascalCase, toCamelCase, collectFields, type FieldInfo } from './type-emitter.js';
 
 /**
  * Emit the parser class for a single ABNF rule.
@@ -9,13 +9,14 @@ import { toPascalCase, toCamelCase } from './type-emitter.js';
  */
 export function emitParserClass(analysis: RuleAnalysis, grammar: AnalyzedGrammar): string {
     const className = toPascalCase(analysis.originalName);
+    const fields = collectFields(analysis.def, grammar);
     const lines: string[] = [];
 
     lines.push(`export class ${className}Parser {`);
     lines.push(`  static parse(input: string, offset: number = 0): ParseResult<${className}Node> {`);
 
     // Generate parse body based on node type
-    const bodyLines = emitParseBody(analysis.def, analysis, grammar, 'offset');
+    const bodyLines = emitParseBody(analysis.def, analysis, grammar, 'offset', fields);
     for (const line of bodyLines) {
         lines.push(`    ${line}`);
     }
@@ -26,7 +27,7 @@ export function emitParserClass(analysis: RuleAnalysis, grammar: AnalyzedGrammar
     return lines.join('\n');
 }
 
-function emitParseBody(node: ASTNode, analysis: RuleAnalysis, grammar: AnalyzedGrammar, offsetVar: string): string[] {
+function emitParseBody(node: ASTNode, analysis: RuleAnalysis, grammar: AnalyzedGrammar, offsetVar: string, fields: FieldInfo[]): string[] {
     switch (node.type) {
         case 'caseInsensitveString':
         case 'caseSensitveString':
@@ -34,15 +35,15 @@ function emitParseBody(node: ASTNode, analysis: RuleAnalysis, grammar: AnalyzedG
         case 'alternation':
             return emitAlternationParse(node, analysis, grammar, offsetVar);
         case 'concatenation':
-            return emitConcatenationParse(node, analysis, grammar, offsetVar);
+            return emitConcatenationParse(node, analysis, grammar, offsetVar, fields);
         case 'repetition':
             return emitRepetitionParse(node, analysis, grammar, offsetVar);
         case 'range':
             return emitRangeParse(node, analysis, offsetVar);
         case 'ruleref':
-            return emitRuleRefParse(node, analysis, grammar, offsetVar);
+            return emitRuleRefParse(node, analysis, grammar, offsetVar, fields);
         case 'group':
-            return emitParseBody(node.alt, analysis, grammar, offsetVar);
+            return emitParseBody(node.alt, analysis, grammar, offsetVar, fields);
         case 'prose':
             return [`return failure('${analysis.name}', ${offsetVar}, 'prose', JSON.stringify(input.charAt(${offsetVar})));`];
         default:
@@ -90,7 +91,7 @@ function emitAlternationParse(node: { alts: ASTNode[] }, analysis: RuleAnalysis,
         }
         lines.push(`})();`);
         lines.push(`if (${altVar}.success) {`);
-        lines.push(`  return success(new ${className}Node(${altVar}.value.raw, ${altVar}.nextOffset), ${altVar}.nextOffset);`);
+        lines.push(`  return success(new ${className}Node(${altVar}.value.raw), ${altVar}.nextOffset);`);
         lines.push(`}`);
         lines.push(`errors.push(${altVar}.error);`);
     }
@@ -103,17 +104,19 @@ function emitAlternationParse(node: { alts: ASTNode[] }, analysis: RuleAnalysis,
  * Emit parse code for a branch within alternation — does NOT wrap in the top-level Node.
  */
 function emitParseBranch(node: ASTNode, analysis: RuleAnalysis, grammar: AnalyzedGrammar, offsetVar: string): string[] {
-    return emitParseBody(node, analysis, grammar, offsetVar);
+    return emitParseBody(node, analysis, grammar, offsetVar, []);
 }
 
-function emitConcatenationParse(node: { elements: ASTNode[] }, analysis: RuleAnalysis, grammar: AnalyzedGrammar, offsetVar: string): string[] {
+function emitConcatenationParse(node: { elements: ASTNode[] }, analysis: RuleAnalysis, grammar: AnalyzedGrammar, offsetVar: string, fields: FieldInfo[]): string[] {
     const className = toPascalCase(analysis.originalName);
     const lines: string[] = [];
     let currentOffset = offsetVar;
+    const fieldOffsetExprs: string[] = [];
 
     for (let i = 0; i < node.elements.length; i++) {
         const partVar = `part${i}`;
         const nextOffset = `offset${i}`;
+        const prevOffset = currentOffset;
         lines.push(`const ${partVar} = (() => {`);
         const partBody = emitParseBranch(node.elements[i], analysis, grammar, currentOffset);
         for (const line of partBody) {
@@ -122,11 +125,26 @@ function emitConcatenationParse(node: { elements: ASTNode[] }, analysis: RuleAna
         lines.push(`})();`);
         lines.push(`if (!${partVar}.success) return ${partVar};`);
         lines.push(`const ${nextOffset} = ${partVar}.nextOffset;`);
+
+        // Track offsets for ruleref elements that produce Node constructor fields
+        if (fields.length > 0) {
+            const el = node.elements[i];
+            if (el.type === 'ruleref') {
+                const refName = el.name.toUpperCase();
+                const refAnalysis = grammar.ruleAnalysis.get(refName);
+                if (refAnalysis) {
+                    fieldOffsetExprs.push(`${prevOffset} - ${offsetVar}`);
+                    fieldOffsetExprs.push(`${nextOffset} - ${offsetVar}`);
+                }
+            }
+        }
+
         currentOffset = nextOffset;
     }
 
     lines.push(`const raw = input.substring(${offsetVar}, ${currentOffset});`);
-    lines.push(`return success(new ${className}Node(raw), ${currentOffset});`);
+    const ctorArgs = ['raw', ...fieldOffsetExprs];
+    lines.push(`return success(new ${className}Node(${ctorArgs.join(', ')}), ${currentOffset});`);
     return lines;
 }
 
@@ -178,7 +196,7 @@ function emitRangeParse(node: { first: number; last: number }, analysis: RuleAna
     return lines;
 }
 
-function emitRuleRefParse(node: { name: string }, analysis: RuleAnalysis, grammar: AnalyzedGrammar, offsetVar: string): string[] {
+function emitRuleRefParse(node: { name: string }, analysis: RuleAnalysis, grammar: AnalyzedGrammar, offsetVar: string, fields: FieldInfo[]): string[] {
     const refName = node.name.toUpperCase();
     const refAnalysis = grammar.ruleAnalysis.get(refName);
     const className = toPascalCase(analysis.originalName);
@@ -191,7 +209,12 @@ function emitRuleRefParse(node: { name: string }, analysis: RuleAnalysis, gramma
     const lines: string[] = [];
     lines.push(`const refResult = ${refClass}Parser.parse(input, ${offsetVar});`);
     lines.push(`if (refResult.success) {`);
-    lines.push(`  return success(new ${className}Node(refResult.value.raw), refResult.nextOffset);`);
+    if (fields.length > 0) {
+        lines.push(`  const raw = refResult.value.raw;`);
+        lines.push(`  return success(new ${className}Node(raw, 0, raw.length), refResult.nextOffset);`);
+    } else {
+        lines.push(`  return success(new ${className}Node(refResult.value.raw), refResult.nextOffset);`);
+    }
     lines.push(`} else {`);
     lines.push(`  return refResult;`);
     lines.push(`}`);
