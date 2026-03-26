@@ -1,6 +1,7 @@
 export { readString, readFile, validateRefs } from './reader/index.js';
 export { analyze } from './analyzer/index.js';
 export { generate, type GenerateOptions } from './codegen/index.js';
+export { grammarsDir, coreAbnfPath } from './grammars.js';
 export {
     MaybeNumeric,
     NumericConversionError,

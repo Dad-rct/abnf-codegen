@@ -1,6 +1,6 @@
 {
   "name": "@pebbletree/abnf-codegen",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Type-safe ABNF (RFC 5234) parser/builder code generator",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -16,6 +16,10 @@
     "./runtime": {
       "types": "./dist/runtime/index.d.ts",
       "import": "./dist/runtime/index.js"
+    },
+    "./grammars": {
+      "types": "./dist/grammars.d.ts",
+      "import": "./dist/grammars.js"
     }
   },
   "bin": {
